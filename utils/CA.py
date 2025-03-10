@@ -25,7 +25,7 @@ class AE(nn.Module):
 
     def init_layers(self, latent_size):
         self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels=4, out_channels=32, kernel_size=4, stride=2, padding=1),
+            nn.Conv2d(in_channels=2, out_channels=32, kernel_size=4, stride=2, padding=1),
             nn.BatchNorm2d(num_features=32),
             nn.LeakyReLU(.2),
             nn.Dropout(0.5),
@@ -119,7 +119,7 @@ class AE(nn.Module):
             nn.LeakyReLU(.2),
             nn.Dropout(0.5),
 
-            nn.ConvTranspose2d(in_channels=32, out_channels=4, kernel_size=4, stride=2, padding=1),
+            nn.ConvTranspose2d(in_channels=32, out_channels=2, kernel_size=4, stride=2, padding=1),
             nn.Softmax(dim=1)
         )
 
@@ -204,7 +204,7 @@ class AE(nn.Module):
 
         def __call__(self, prediction, target, validation=False):
             metrics = {}
-            for c,key in enumerate(["BK_", "RV_", "MYO_", "LV_"]):
+            for c,key in enumerate(["structure", "background"]):
                 ref = np.copy(target)
                 pred = np.copy(prediction)
 
@@ -222,7 +222,9 @@ class AE(nn.Module):
         best_acc = None
         for epoch in epochs:
             self.train()
+            print('epoch No. ' + str(epoch))
             for patient in train_loader:
+                print('.', end='', flush=True)
                 for batch in patient:
                     batch = batch.to(device)
                     self.optimizer.zero_grad()
@@ -248,6 +250,8 @@ class AE(nn.Module):
 
     def evaluation_routine(self, val_loader, epoch):
         epoch_summary = {}
+        print('running validation')
+        print('.', end='', flush=True)
         for patient in val_loader:
             gt, reconstruction = [], []
             for batch in patient:
@@ -261,14 +265,12 @@ class AE(nn.Module):
                     epoch_summary[k].append(v)
             
             gt = np.argmax(gt.cpu().numpy(), axis=1)
-            gt = {"ED": gt[:len(gt)//2], "ES":gt[len(gt)//2:]}
             reconstruction = np.argmax(reconstruction.cpu().numpy(), axis=1)
-            reconstruction = {"ED": reconstruction[:len(reconstruction)//2], "ES": reconstruction[len(reconstruction)//2:]}
-            for phase in ["ED", "ES"]:
-                for k,v in self.metrics(reconstruction[phase], gt[phase]).items():
-                    if k not in epoch_summary.keys():
-                        epoch_summary[k] = []
-                    epoch_summary[k].append(v)
+
+            for k,v in self.metrics(reconstruction, gt).items():
+                if k not in epoch_summary.keys():
+                    epoch_summary[k] = []
+                epoch_summary[k].append(v)
         epoch_summary = {k: np.mean(v) for k,v in epoch_summary.items()}
         return epoch_summary
 
@@ -346,7 +348,8 @@ def hyperparameter_tuning(parameters, train_loader, val_loader, transform, trans
             train_loader,
             val_loader
         )
-        history = {k:[x[k] for x in history] for k in history[0].keys() if k in ["LV_dc", "MYO_dc", "RV_dc"]}
+        print('history is: ' + str(history))
+        history = {k:[x[k] for x in history] for k in history[0].keys() if k in ["structure"]}
         history = pd.DataFrame.from_dict(history)
         
         wasBlack = any(np.all(history.values==0, axis=1))

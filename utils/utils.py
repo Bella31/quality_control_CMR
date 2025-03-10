@@ -132,7 +132,7 @@ class CenterCrop(object):
         return sample
 
 class OneHot(object):
-    def one_hot(self, seg, num_classes=4):
+    def one_hot(self, seg, num_classes=2):
         return np.eye(num_classes)[seg.astype(int)].transpose(2,0,1)
     def __call__(self, sample):
         sample = self.one_hot(sample)
