@@ -8,21 +8,36 @@ import nibabel as nib
 import torchvision
 from utils.utils import *
 
-def move_smallest_axis_to_z(vol):
+def move_smallest_axis_to_first_axis(vol):
     shape = vol.shape
     min_index = shape.index(min(shape))
 
-    if(min_index != 2):
-        vol = np.swapaxes(vol, min_index, 2)
+    if(min_index != 0):
+        vol = np.swapaxes(vol, min_index, 0)
 
     return vol, min_index
 
+# def move_smallest_axis_to_z(vol):
+#     shape = vol.shape
+#     min_index = shape.index(min(shape))
+#
+#     if(min_index != 2):
+#         vol = np.swapaxes(vol, min_index, 2)
+#
+#     return vol, min_index
 
-def swap_to_original_axis(swap_axis, vol):
-    if(swap_axis != 2):
-        new_vol = np.swapaxes(vol, swap_axis, 2)
+
+def swap_to_original_axis_from_first(swap_axis, vol):
+    if(swap_axis != 0):
+        new_vol = np.swapaxes(vol, swap_axis, 0)
         return new_vol
     return vol
+
+# def swap_to_original_axis(swap_axis, vol):
+#     if(swap_axis != 2):
+#         new_vol = np.swapaxes(vol, swap_axis, 2)
+#         return new_vol
+#     return vol
 
 transform = torchvision.transforms.Compose([
         AddPadding((512, 512)),
@@ -43,8 +58,8 @@ class FetalVolume(torch.utils.data.Dataset):
         self.root_dir = root_dir
         self.id = case_id
         data = np.int16(nib.load(os.path.join(root_dir, case_id, filename)).get_fdata())
-        data, swap_axis = move_smallest_axis_to_z(data)
-        self.num_slices = data.shape[2]
+        data, swap_axis = move_smallest_axis_to_first_axis(data)
+        self.num_slices = data.shape[0]
         self.transform = transform
         self.swap_axis = swap_axis
         self.data = data
@@ -54,7 +69,7 @@ class FetalVolume(torch.utils.data.Dataset):
 
     def __getitem__(self, slice_id):
 
-        sample = self.data[:,:, slice_id]
+        sample = self.data[slice_id]
         if self.transform:
             sample = self.transform(sample)
         return sample
@@ -78,7 +93,7 @@ class FetalDataLoader:
         self.volume_loaders = []
         for id in self.patient_ids:
             self.volume_loaders.append(torch.utils.data.DataLoader(
-                FetalVolume(self.root_dir, id, transform=self.transform),
+                FetalVolume(self.root_dir, id, transform=self.transform, filename = "truth.nii.gz"),
                 batch_size=batch_size, shuffle=False, num_workers=0
             ))
 
@@ -126,8 +141,7 @@ def fetal_testing(ae, test_loader, folder_predictions, mask_filename, folder_out
           #  reconstruction = reconstruction[:len(reconstruction)//2].cpu().numpy()
             reconstruction = reconstruction.cpu().numpy()
             reconstruction = np.argmax(reconstruction, axis=1)
-            reconstruction = swap_to_original_axis(0, reconstruction)
-            reconstruction = swap_to_original_axis(patient.dataset.swap_axis, reconstruction)
+            reconstruction = swap_to_original_axis_from_first(patient.dataset.swap_axis, reconstruction)
 
             mask_data = nib.load(os.path.join(folder_predictions, id, mask_filename))
             results[id] = evaluate_metrics(mask_data.get_fdata(), reconstruction)
