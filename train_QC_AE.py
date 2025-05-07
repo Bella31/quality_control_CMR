@@ -4,8 +4,7 @@ from sacred.observers import FileStorageObserver
 from sacred import Experiment
 import torch
 from utils.CA import AE, plot_history
-from utils.utils_fetal import FetalDataLoader, list_load, transform, transform_augmentation
-
+from utils.utils_fetal import FetalDataLoader, list_load, transform, transform_augmentation, DATA_SIZE
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ex = Experiment()
@@ -13,16 +12,17 @@ ex = Experiment()
 @ex.config
 def config():
     my_path = os.path.abspath(os.path.dirname(__file__))
-    data_path = '/home/bella/Phd/data/body/TRUFI/TRUFI'
-    train_valid_lists_path = '/home/bella/Phd/code/code_bella/fetal_mr/config/config_body/quality_estimation/trufi_qe/0'
-    data_size = [512, 512]
-    num_epochs = 100
+    data_path = '/home/bella/Postdoc/data/synthstrip_data_v1.4'
+    train_valid_lists_path = '/home/bella/Postdoc/code/synth_ssl_seg/config/brain_3D_synthstrip/folds/folds_splits/fold_4'
+    data_size = [DATA_SIZE, DATA_SIZE]
+    num_epochs = 500
+    truth_filename = 'mask.nii.gz'
     opt_params = {
-        "BATCH_SIZE": 32,
-        "DA": False,
+        "BATCH_SIZE": 8,
+        "DA": True,
         "latent_size": 100,
         "optimizer": torch.optim.Adam,
-        "lr": 2e-4,
+        "lr": 0.001,
         "weight_decay": 1e-5,
         "functions": ["BKGDLoss", "BKMSELoss"],
         "settling_epochs_BKGDLoss": 10,
@@ -31,7 +31,7 @@ def config():
 
 
 @ex.main
-def my_main(data_path, train_valid_lists_path, num_epochs, opt_params):
+def my_main(data_path, train_valid_lists_path, num_epochs, opt_params, truth_filename):
   #  train_masks, validation_masks = Preprocess.load_preprocess_data(data_path, train_valid_lists_path, data_size)
   ae = AE(**opt_params).to(device)
 
@@ -54,9 +54,9 @@ def my_main(data_path, train_valid_lists_path, num_epochs, opt_params):
   plot_history(
       ae.training_routine(
           range(start, num_epochs),
-          FetalDataLoader(data_path, patient_ids=train_ids, batch_size=opt_params["BATCH_SIZE"], filename='truth.nii.gz',
+          FetalDataLoader(data_path, patient_ids=train_ids, batch_size=opt_params["BATCH_SIZE"], filename=truth_filename,
                           transform=transform_augmentation if opt_params["DA"] else transform),
-          FetalDataLoader(data_path, patient_ids=val_ids, batch_size=opt_params["BATCH_SIZE"], filename='truth.nii.gz',
+          FetalDataLoader(data_path, patient_ids=val_ids, batch_size=opt_params["BATCH_SIZE"], filename=truth_filename,
                           transform=transform),
           os.path.join(ex.observers[0].dir, "checkpoints")
       )

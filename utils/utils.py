@@ -84,12 +84,18 @@ def preprocess(patient_ids, patient_info, spacing_target, folder, folder_out, ge
 ###########
 ##Dataset##
 ###########
+def get_image(data, affine=None, nib_class=nib.Nifti1Image):
+    if affine is None:
+        affine = np.eye(4)
+    return nib_class(dataobj=data, affine=affine)
+
 
 class AddPadding(object):
     def __init__(self, output_size):
         self.output_size = output_size
 
     def resize_image_by_padding(self, image, new_shape, pad_value=0):
+       # nib.save(get_image(image), os.path.join('/media/bella/8A1D-C0A6/Phd/tmp', 'origin_truth.nii.gz'))
         shape = tuple(list(image.shape))
         new_shape = tuple(np.max(np.concatenate((shape, new_shape)).reshape((2, len(shape))), axis=0))
         if pad_value is None:
@@ -106,6 +112,7 @@ class AddPadding(object):
         elif len(shape) == 3:
             res[int(start[0]):int(start[0]) + int(shape[0]), int(start[1]):int(start[1]) + int(shape[1]),
             int(start[2]):int(start[2]) + int(shape[2])] = image
+
         return res
   
     def __call__(self, sample):

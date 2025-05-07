@@ -211,8 +211,8 @@ class AE(nn.Module):
                 ref = np.where(ref!=c, 0, 1)
                 pred = np.where(pred!=c , 0, 1)
 
-                metrics[key + "dc"] = self.DC(pred, ref)
-                metrics[key + "hd"] = self.HD(pred, ref)
+                metrics[key + "_dc"] = self.DC(pred, ref)
+                metrics[key + "_hd"] = self.HD(pred, ref)
             return metrics
 
     def training_routine(self, epochs, train_loader, val_loader, ckpt_folder=None):
@@ -348,19 +348,14 @@ def hyperparameter_tuning(parameters, train_loader, val_loader, transform, trans
             train_loader,
             val_loader
         )
-        print('history is: ' + str(history))
-        history = {k:[x[k] for x in history] for k in history[0].keys() if k in ["structure"]}
+        print('history is: ' + str(history[0]))
+        history = {k:[x[k] for x in history] for k in history[0].keys() if k in ["structure_dc"]}
         history = pd.DataFrame.from_dict(history)
-        
-        wasBlack = any(np.all(history.values==0, axis=1))
-        isNotBlack = all(history.values[-1] > 0.01)
+
         avg_dc = np.mean(history.values[-1])
 
-        if wasBlack and isNotBlack:
-            if avg_dc > best_dc:
-                best_dc = avg_dc
-                optimal_parameters = set_parameters.copy()
-            if fast:
-                break
+        if avg_dc > best_dc:
+            best_dc = avg_dc
+            optimal_parameters = set_parameters.copy()
 
     return optimal_parameters
